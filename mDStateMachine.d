@@ -50,6 +50,23 @@ template genEnum(string Name, string[] values)
 
 
 
+// Generates an enum Name with members values
+template genEnum(string Name, string[] values)
+{
+	auto gen()
+	{
+		import std.conv : to;
+		string s = "enum "~Name~"\n{";
+		static foreach(k, c; values)
+			s ~= "\n\t"~c~" = "~to!string(k)~",";
+		return s~"\n}";
+	}
+	enum genEnum = gen;
+}
+
+
+
+
 /*
 	A State Machine is a quasi-deterministic finite recursive structure that allows one to discretize a transitionary process in to a finite number of states. The machine can only be in any one state at any time and therefor can only take a single transition at that time and therefor the transitions are time dependent and depend upon the context.
 
@@ -147,6 +164,8 @@ abstract class aStateMachine : aState, iStateMachine
 		import std.traits, std.meta, std.string;
 		import mDStateMachine : getInnerClasses;
 		import mDGraphViz;
+		import std.algorithm : max;
+
 		// Attributes
 		enum Start;					// Declares a starting state, else defaults to the first declared state
 
@@ -164,14 +183,11 @@ abstract class aStateMachine : aState, iStateMachine
 		// The starting state of the machine after a init/reset
 		iState startState;
 
-		// The previous state
-		iState PreviousState; 
-
 		// The current state of the machine
 		iState currentState;
 		iState CurrentState() { return currentState; }
 
-		int MaxHistory = 100;
+		int MaxHistory = 20;	
 		iState[] History;
 
 		// Constructor
@@ -212,7 +228,6 @@ abstract class aStateMachine : aState, iStateMachine
 				mixin(`currentState = States[eStates.`~(_stateNames[0])~`];`);		// Assumes array is ordered to source code
 
 			startState = currentState;
-			PreviousState = null;
 		}
 
 		// Step the Current State
@@ -260,17 +275,17 @@ abstract class aStateMachine : aState, iStateMachine
 				CurrentState.Exit();
 				
 				// Record transition
-				History ~= CurrentState;
-				if (History.length > MaxHistory*2)
+				History ~= CurrentState;				
+				auto maxHistory = max(2, MaxHistory);
+				if (History.length > maxHistory*2)
 				{
-					History[0..MaxHistory] = History[MaxHistory..MaxHistory*2];
-					History.length = MaxHistory;
+					History[0..maxHistory] = History[maxHistory..maxHistory*2];
+					History.length = maxHistory;
 				}
 
 				TransAction(CurrentState, found);
 
 				// Enter next state
-				PreviousState = CurrentState;
 				currentState = found;		
 
 				CurrentState.Enter();
@@ -289,13 +304,15 @@ abstract class aStateMachine : aState, iStateMachine
 
 
 		// GraphViz the Current State of the StateMachine
-		void GraphViz(string fn, iState highlight = null, string[string][] options = null)
+		void GraphViz(string fn, iState highlight = null, iState previousState = null, string[string] options = null)
 		{version(EnableGraphing){
 			import std.process, std.file, std.path, std.string;
 			fn = stripExtension(fn);
+			if (!previousState && History.length > 0) previousState = History[$-1];
 			auto g = new Directed;
 			with (g) 
 			{
+				// Draw Nodes
 				foreach(k, s; States)
 				{
 					string[string] opt;
@@ -317,16 +334,18 @@ abstract class aStateMachine : aState, iStateMachine
 					node(s, opt);
 				}
 
-				foreach(k, s; States)
+				
+				// Draw edges
+				foreach(s; States)
 				{
 					string[string] opt;
 					// Add edges away from
-					foreach(l, t; States)
+					foreach(t; States)
 					{
 						if (t.IsEnterableFrom(s) && s.IsExitableTo(t))
 						{
 							// Highlight ith node
-							if (PreviousState && highlight == t && PreviousState == s)
+							if (previousState && highlight == t && previousState == s)
 							{
 								opt["color"] = "#2233ff";
 								opt["style"] = "solid";
@@ -366,11 +385,14 @@ abstract class aStateMachine : aState, iStateMachine
 				import std.range, std.conv;
 				string[] files;
 				string fnx;
+				iState previousState = null;
 				foreach(k, s; History)
 				{
 					files ~= "__tmp__"~fn~"__"~to!string(rightJustifier(to!string(k), 4, '0').array);
-					GraphViz(files[$-1], s);
+					GraphViz(files[$-1], s, previousState);
 					fnx ~= files[$-1]~".png ";
+
+					previousState = s;
 				}
 			
 				executeShell(APNGBin~"apngasm.exe "~fn~"Ani.png "~fnx~" 15");
@@ -388,5 +410,4 @@ abstract class aStateMachine : aState, iStateMachine
 			executeShell(APNGViewer~" "~fn~"Ani.png");
 		}}
 }}
-
 
