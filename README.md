@@ -41,5 +41,6 @@ The following is a simple example of a 3-state machine that sequentially transit
 		}
 	}
   
+  DStateMachine can output a GraphViz of the state machine at runtime either based on the history of the state machine(useful for debugging purposes) or the current state.
   
   ![Simple Machine](https://raw.githubusercontent.com/TheUniversalInvariant/DStateMachine/master/MyStateMachineAni.png)
