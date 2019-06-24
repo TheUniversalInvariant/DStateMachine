@@ -146,7 +146,7 @@ abstract class aStateMachine : aState, iStateMachine
 
 		import std.traits, std.meta, std.string;
 		import mDStateMachine : getInnerClasses;
-
+		import mDGraphViz;
 		// Attributes
 		enum Start;					// Declares a starting state, else defaults to the first declared state
 
